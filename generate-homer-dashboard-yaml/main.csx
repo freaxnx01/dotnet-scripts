@@ -9,12 +9,17 @@ using Docker.DotNet.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-public static Regex MyRegex = new Regex(
+public static Regex HostPathPrefixRegex = new Regex(
     "Host\\(`(?<host>[^`]*)`\\).*PathPrefix\\(`(?<path>[^`]*)`\\)",
     RegexOptions.CultureInvariant
     | RegexOptions.Compiled
 );
 
+public static Regex HostRegex = new Regex(
+    "Host\\(`(?<host>[^`]*)`\\)",
+    RegexOptions.CultureInvariant
+    | RegexOptions.Compiled
+);
 public record Item(string Name, string Tag, string Url);
 public record Category(string Name, List<Item> Items);
 
@@ -69,7 +74,13 @@ foreach (var container in containers)
         if (!label.Equals(default(KeyValuePair<string, string>)))
         {
             var rule = label.Value;
-            var match = MyRegex.Match(rule);
+            var match = HostPathPrefixRegex.Match(rule);
+            match = HostRegex.Match(rule);
+            
+            if (!match.Groups.ContainsKey("path"))
+            {
+                 match = HostRegex.Match(rule);
+            }
 
             var item = new Item(
                 Name: title, 
