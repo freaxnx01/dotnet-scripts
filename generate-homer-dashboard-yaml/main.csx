@@ -75,9 +75,8 @@ foreach (var container in containers)
         {
             var rule = label.Value;
             var match = HostPathPrefixRegex.Match(rule);
-            match = HostRegex.Match(rule);
             
-            if (!match.Groups.ContainsKey("path"))
+            if (string.IsNullOrEmpty(match.Groups["path"].Value))
             {
                  match = HostRegex.Match(rule);
             }
