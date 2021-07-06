@@ -15,7 +15,7 @@ public static Regex MyRegex = new Regex(
     | RegexOptions.Compiled
 );
 
-public record Item(string Name, string Url);
+public record Item(string Name, string Tag, string Url);
 public record Category(string Name, List<Item> Items);
 
 DockerClient client = new DockerClientConfiguration(
@@ -56,6 +56,14 @@ foreach (var container in containers)
             services.Add(category);
         }
 
+        // Title
+        var title = string.Empty;
+        var titleLabel = container.Labels.SingleOrDefault(l => l.Key == TitleLabel);
+        if (!titleLabel.Equals(default(KeyValuePair<string, string>)))
+        {
+            title = titleLabel.Value;
+        }
+        
         var label = container.Labels.SingleOrDefault(
             l => l.Key.StartsWith(TraefikRouterStart) && l.Key.EndsWith(TraefikRouterEnd));
         if (!label.Equals(default(KeyValuePair<string, string>)))
@@ -63,7 +71,11 @@ foreach (var container in containers)
             var rule = label.Value;
             var match = MyRegex.Match(rule);
 
-            var item = new Item(Name: container.Names[0].Substring(1).FirstCharToUpper(), Url: $"https://{match.Groups["host"].Value}{match.Groups["path"].Value}");
+            var item = new Item(
+                Name: title, 
+                Tag: container.Names[0].Substring(1).FirstCharToUpper(),
+                Url: $"https://{match.Groups["host"].Value}{match.Groups["path"].Value}"
+            );
 
             category.Items.Add(item);
         }
