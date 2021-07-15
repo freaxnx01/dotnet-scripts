@@ -6,8 +6,10 @@
 using System.Text.RegularExpressions;
 using Docker.DotNet;
 using Docker.DotNet.Models;
+using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using YamlDotNet.Serialization.EventEmitters;
 
 public static Regex HostPathPrefixRegex = new Regex(
     "Host\\(`(?<host>[^`]*)`\\).*PathPrefix\\(`(?<path>[^`]*)`\\)",
@@ -121,7 +123,9 @@ foreach (var container in containers)
 var serializer = new SerializerBuilder()
     .WithNamingConvention(CamelCaseNamingConvention.Instance)
     .WithIndentedSequences()
+    .WithEventEmitter(nextEmitter => new QuoteSurroundingEventEmitter(nextEmitter))
     .Build();
+
 var yaml = serializer.Serialize(dashboard);
 Console.Write(yaml);
 
@@ -137,3 +141,16 @@ public static string FirstCharToUpper(this string input) =>
         "" => throw new ArgumentException($"{nameof(input)} cannot be empty", nameof(input)),
         _ => input.First().ToString().ToUpper() + input.Substring(1)
     };
+
+public class QuoteSurroundingEventEmitter : ChainedEventEmitter
+{
+    public QuoteSurroundingEventEmitter(IEventEmitter nextEmitter)  : base(nextEmitter)
+    { }
+
+    public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
+    {
+        if(eventInfo.Source.StaticType == typeof (String))
+            eventInfo.Style = ScalarStyle.DoubleQuoted;
+            base.Emit(eventInfo, emitter);
+    }
+}
