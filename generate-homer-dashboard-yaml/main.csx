@@ -23,9 +23,6 @@ public static Regex HostRegex = new Regex(
     | RegexOptions.Compiled
 );
 
-Console.Write("abc");
-return 0;
-
 /*
 title: "Demo dashboard"
 subtitle: "Homer"
