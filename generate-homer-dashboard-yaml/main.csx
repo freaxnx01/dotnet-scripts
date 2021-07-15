@@ -20,8 +20,27 @@ public static Regex HostRegex = new Regex(
     RegexOptions.CultureInvariant
     | RegexOptions.Compiled
 );
-public record Item(string Name, string Tag, string Url);
-public record Category(string Name, List<Item> Items);
+
+/*
+title: "Demo dashboard"
+subtitle: "Homer"
+logo: "logo.png"
+
+services:
+  - name: "Applications"
+    icon: "fas fa-cloud"
+    items:
+      - name: "Awesome app"
+        logo: "assets/tools/sample.png"
+        subtitle: "Bookmark example"
+        tag: "app"
+        url: "https://www.reddit.com/r/selfhosted/"
+        target: "_blank" # optional html a tag target attribute
+*/
+
+public record Dashboard(string Title, string Subtitle, string Logo, List<Category> Services);
+public record Category(string Name, string Icon, List<Item> Items);
+public record Item(string Name, string Tag, string Url, string Target = "_blank", string Logo = "assets/tools/sample.png", string Subtitle = "");
 
 DockerClient client = new DockerClientConfiguration(
         new Uri("unix:///var/run/docker.sock"))
@@ -36,9 +55,12 @@ const string TraefikRouterEnd= ".rule";
 const string CategoryLabel= "ch.freaxnx01.category";
 const string TitleLabel= "ch.freaxnx01.title";
 
-var entries = new List<Item>();
-
-var services = new List<Category>();
+var dashboard = new Dashboard(
+    Title: "Dashboard",
+    Subtitle: "",
+    Logo: "logo.png",
+    Services: new List<Category>()
+);
 
 foreach (var container in containers)
 {
@@ -53,12 +75,16 @@ foreach (var container in containers)
             categoryName = categoryLabel.Value;
         }
 
-        var category = services.SingleOrDefault(c => c.Name == categoryName);
+        var category = dashboard.Services.SingleOrDefault(c => c.Name == categoryName);
 
         if (category is null)
         {
-            category = new Category(Name: categoryName, Items: new List<Item>());
-            services.Add(category);
+            category = new Category(
+                Name: categoryName,
+                Icon: "fas fa-cloud",
+                Items: new List<Item>()
+            );
+            dashboard.Services.Add(category);
         }
 
         // Title
@@ -94,8 +120,9 @@ foreach (var container in containers)
 
 var serializer = new SerializerBuilder()
     .WithNamingConvention(CamelCaseNamingConvention.Instance)
+    .WithIndentedSequences()
     .Build();
-var yaml = serializer.Serialize(services);
+var yaml = serializer.Serialize(dashboard);
 Console.Write(yaml);
 
 public static void Dump(this object text)
