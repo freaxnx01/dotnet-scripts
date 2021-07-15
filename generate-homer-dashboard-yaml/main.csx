@@ -123,7 +123,7 @@ foreach (var container in containers)
 var serializer = new SerializerBuilder()
     .WithNamingConvention(CamelCaseNamingConvention.Instance)
     .WithIndentedSequences()
-    .WithEventEmitter(nextEmitter => new QuoteSurroundingEventEmitter(nextEmitter))
+    //.WithEventEmitter(nextEmitter => new QuoteSurroundingEventEmitter(nextEmitter))
     .Build();
 
 var yaml = serializer.Serialize(dashboard);
