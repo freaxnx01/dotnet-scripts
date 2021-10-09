@@ -132,7 +132,7 @@ foreach (var container in relevantContainers)
                     Url: string.Concat(baseUrl, subLabel.Value["target"])
                 );
 
-                service.Items.Add(subLabel.Key, item);
+                //service.Items.Add(subLabel.Key, item);
             }
         }
         else
