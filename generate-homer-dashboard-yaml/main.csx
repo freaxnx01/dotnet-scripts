@@ -31,7 +31,7 @@ services:
 */
 
 public record Dashboard(string Title, string Subtitle, string Logo, List<Service> Services);
-public record Service(string Name, string Icon, SortedList<string, Item> Items);
+public record Service(string Name, string Icon, List<Item> Items);
 public record Item(string Name, string Tag, string Url, string Target = "_blank", string Logo = "assets/tools/sample.png", string Subtitle = "");
 
 var containers = await GetDockerClient().Containers.ListContainersAsync(new ContainersListParameters());
@@ -103,7 +103,8 @@ foreach (var container in relevantContainers)
         service = new Service(
             Name: serviceName,
             Icon: "fas fa-cloud",
-            Items: new SortedList<string, Item>()
+            Items: new List<Item>()
+            //Items: new SortedList<string, Item>()
         );
         dashboard.Services.Add(service);
     }
@@ -144,7 +145,8 @@ foreach (var container in relevantContainers)
                 Url: baseUrl
             );
 
-            service.Items.Add(containerName, item);
+            service.Items.Add(item);
+            //service.Items.Add(containerName, item);
         }
     }
 }
