@@ -90,12 +90,12 @@ foreach (var container in relevantContainers)
 
     var title = container.LabelNamed(TitleLabel);
 
-    // ch.freaxnx01.path
+    // .path
     var hasPathLabels = container.Labels.Any(l => l.Key.StartsWith(PathLabel));
 
     if (hasPathLabels)
     {
-        categoryName += $" {title}";
+        serviceName += $" {title}";
     }
 
     if (service is null)
@@ -115,6 +115,7 @@ foreach (var container in relevantContainers)
 
         //TODO: Ensure end with /
         var baseUrl = $"https://{host}{path}/";
+        var containerName = container.Names[0].Substring(1).FirstCharToUpper();
 
         if (hasPathLabels)
         {
@@ -123,13 +124,22 @@ foreach (var container in relevantContainers)
             - "ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
             */
 
-            var subLabels = GetSubLabels(PathLabel);
+            foreach (var subLabel in GetSubLabels(PathLabel, container.Labels))
+            {
+                var item = new Item(
+                    Name: subLabel.Value["title"], 
+                    Tag: containerName,
+                    Url: string.Concat(baseUrl, subLabel.Value["target"])
+                );
+
+                service.Items.Add(subLabel.Key, item);
+            }
         }
         else
         {
             var item = new Item(
                 Name: title, 
-                Tag: container.Names[0].Substring(1).FirstCharToUpper(),
+                Tag: containerName,
                 Url: baseUrl
             );
 
@@ -148,7 +158,7 @@ var dashboardSorted = new Dashboard(
 Console.Write(dashboardSorted.SerialzeToYaml());
 
 //TODO -> DockerApiClient
-public Dictionary<string, Dictionary<string, string>> GetSubLabels(string subLabel)
+public Dictionary<string, Dictionary<string, string>> GetSubLabels(string subLabelName, IDictionary<string, string> labels)
 {
     /*
     Input:
@@ -163,9 +173,31 @@ public Dictionary<string, Dictionary<string, string>> GetSubLabels(string subLab
         - target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8
     */
 
-    var returnValue = new Dictionary<string, Dictionary<string, string>>();
+    var dict = new Dictionary<string, Dictionary<string, string>>();
 
-    return returnValue;
+    var labelTag = string.Empty;
+
+    foreach (var subLabel in labels.Where(l => l.Key.StartsWith(subLabelName)))
+    {
+        var subLabelKey = subLabel.Key.Replace(subLabelName + ".", string.Empty);
+
+        var splitValues = subLabelKey.Split('.');
+        if (splitValues.Count() == 2)
+        {
+            // switzerland.title
+            labelTag = splitValues[0];
+            var key = splitValues[1];
+
+            if (!dict.ContainsKey(labelTag))
+            {
+                dict.Add(labelTag, new Dictionary<string, string>());
+            }
+
+            dict[labelTag].Add(key, subLabel.Value);
+        }
+    }
+
+    return dict;
 }
 
 #region Parse Traefik rule
