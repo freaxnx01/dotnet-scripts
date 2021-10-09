@@ -30,9 +30,50 @@ services:
         target: "_blank" # optional html a tag target attribute
 */
 
-public record Dashboard(string Title, string Subtitle, string Logo, List<Service> Services);
-public record Service(string Name, string Icon, List<Item> Items);
-public record Item(string Name, string Tag, string Url, string Target = "_blank", string Logo = "assets/tools/sample.png", string Subtitle = "");
+public class Dashboard
+{
+    public string Title { get; set; }
+    public string Subtitle { get; set; }
+    public string Logo { get; set; }
+    public List<Service> Services { get; set; }
+
+    public Dashboard()
+    {
+        Services = new List<Service>();
+    }
+}
+
+public class Service
+{
+    public string Name { get; set; }
+    public string Icon { get; set; }
+    public List<Item> Items { get; set; }
+
+    public Service()
+    {
+        Items = new List<Item>();
+    }
+}
+
+public class Item
+{
+    public string Name { get; set; }
+    public string Tag { get; set; }
+    public string Url { get; set; }
+    public string Target { get; set; }
+    public string Logo { get; set; }
+    public string Subtitle { get; set; }
+
+    public Item()
+    {
+        Target = "_blank";
+        Logo = "assets/tools/sample.png";
+    }
+}
+
+// public record Dashboard(string Title, string Subtitle, string Logo, List<Service> Services);
+// public record Service(string Name, string Icon, List<Item> Items);
+// public record Item(string Name, string Tag, string Url, string Target = "_blank", string Logo = "assets/tools/sample.png", string Subtitle = "");
 
 var containers = await GetDockerClient().Containers.ListContainersAsync(new ContainersListParameters());
 
@@ -70,12 +111,19 @@ foreach (var container in relevantContainers)
 {
     if (container.LabelExists(DashboardTitleLabel))
     {
-        dashboard = new Dashboard(
-            Title: container.LabelNamed(DashboardTitleLabel),
-            Subtitle: "",
-            Logo: "logo.png",
-            Services: new List<Service>()
-        );
+        dashboard = new Dashboard()
+        {
+            Title = container.LabelNamed(DashboardTitleLabel),
+            Subtitle = "",
+            Logo = "logo.png"
+        };
+
+        // dashboard = new Dashboard(
+        //     Title: container.LabelNamed(DashboardTitleLabel),
+        //     Subtitle: "",
+        //     Logo: "logo.png",
+        //     Services: new List<Service>()
+        // );
     }
 }
 
@@ -100,12 +148,20 @@ foreach (var container in relevantContainers)
 
     if (service is null)
     {
-        service = new Service(
-            Name: serviceName,
-            Icon: "fas fa-cloud",
-            Items: new List<Item>()
+        service = new Service()
+        {
+            Name = serviceName,
+            Icon = "fas fa-cloud",
             //Items: new SortedList<string, Item>()
-        );
+        };
+
+        // service = new Service(
+        //     Name: serviceName,
+        //     Icon: "fas fa-cloud",
+        //     Items: new List<Item>()
+        //     //Items: new SortedList<string, Item>()
+        // );
+        
         dashboard.Services.Add(service);
     }
 
@@ -127,23 +183,38 @@ foreach (var container in relevantContainers)
 
             foreach (var subLabel in GetSubLabels(PathLabel, container.Labels))
             {
-                var item = new Item(
-                    Name: subLabel.Value["title"], 
-                    Tag: $"{containerName} {subLabel.Key}",
-                    Url: string.Concat(baseUrl, subLabel.Value["target"])
-                );
+                var item = new Item()
+                {
+                    Name = subLabel.Value["title"], 
+                    Tag = $"{containerName} {subLabel.Key}",
+                    Url = string.Concat(baseUrl, subLabel.Value["target"])
+                };
+
+                // var item = new Item(
+                //     Name: subLabel.Value["title"], 
+                //     Tag: $"{containerName} {subLabel.Key}",
+                //     Url: string.Concat(baseUrl, subLabel.Value["target"])
+                // );
 
                 //TODO
+                service.Items.Add(item);
                 //service.Items.Add(subLabel.Key, item);
             }
         }
         else
         {
-            var item = new Item(
-                Name: title, 
-                Tag: containerName,
-                Url: baseUrl
-            );
+            var item = new Item()
+            {
+                Name = title, 
+                Tag = containerName,
+                Url = baseUrl
+            };
+
+            // var item = new Item(
+            //     Name: title, 
+            //     Tag: containerName,
+            //     Url: baseUrl
+            // );
 
             service.Items.Add(item);
             //service.Items.Add(containerName, item);
@@ -151,12 +222,25 @@ foreach (var container in relevantContainers)
     }
 }
 
-var dashboardSorted = new Dashboard(
-    Title: dashboard.Title,
-    Subtitle: dashboard.Subtitle,
-    Logo: dashboard.Logo,
-    Services: dashboard.Services.OrderBy(s => s.Name).ToList()
-);
+var dashboardSorted = new Dashboard()
+{
+    Title = dashboard.Title,
+    Subtitle = dashboard.Subtitle,
+    Logo = dashboard.Logo,
+    Services = dashboard.Services.OrderBy(s => s.Name).ToList()
+};
+
+// var dashboardSorted = new Dashboard(
+//     Title: dashboard.Title,
+//     Subtitle: dashboard.Subtitle,
+//     Logo: dashboard.Logo,
+//     Services: dashboard.Services.OrderBy(s => s.Name).ToList()
+// );
+
+foreach (var service in dashboardSorted.Services)
+{
+    service.Items = service.Items.OrderBy(s => s.Name).ToList();
+}
 
 Console.Write(dashboardSorted.SerialzeToYaml());
 
