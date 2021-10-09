@@ -3,25 +3,15 @@
 #r "nuget: Docker.DotNet, 3.125.4"
 #r "nuget: YamlDotNet, 11.2.1"
 
+using System.Collections;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using YamlDotNet.Serialization.EventEmitters;
-
-public static Regex HostPathPrefixRegex = new Regex(
-    "Host\\(`(?<host>[^`]*)`\\).*PathPrefix\\(`(?<path>[^`]*)`\\)",
-    RegexOptions.CultureInvariant
-    | RegexOptions.Compiled
-);
-
-public static Regex HostRegex = new Regex(
-    "Host\\(`(?<host>[^`]*)`\\)",
-    RegexOptions.CultureInvariant
-    | RegexOptions.Compiled
-);
 
 /*
 title: "Demo dashboard"
@@ -40,121 +30,122 @@ services:
         target: "_blank" # optional html a tag target attribute
 */
 
-public record Dashboard(string Title, string Subtitle, string Logo, List<Category> Services);
-public record Category(string Name, string Icon, List<Item> Items);
+public record Dashboard(string Title, string Subtitle, string Logo, List<Service> Services);
+public record Service(string Name, string Icon, SortedList<string, Item> Items);
 public record Item(string Name, string Tag, string Url, string Target = "_blank", string Logo = "assets/tools/sample.png", string Subtitle = "");
 
-DockerClient client = new DockerClientConfiguration(
-        new Uri("npipe://./pipe/docker_engine"))
-    .CreateClient();
-// Win: npipe://./pipe/docker_engine
-// unix:///var/run/docker.sock
+var containers = await GetDockerClient().Containers.ListContainersAsync(new ContainersListParameters());
 
-var containers = await client.Containers.ListContainersAsync(new ContainersListParameters());
+// Docker labels
+
+/*
+"ch.freaxnx01.dashboard-title=8c458b.online-server.cloud"
+
+"ch.freaxnx01.category=Cloud"
+"ch.freaxnx01.title=Nextcloud"
+
+"ch.freaxnx01.category=web.freaxnx01.ch"
+"ch.freaxnx01.title=Movies"
+
+"ch.freaxnx01.path.switzerland.title=Schweiz"
+"ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
+*/
+
+const string BaseLabel = "ch.freaxnx01.";
+const string DashboardTitleLabel = BaseLabel + "dashboard-title";
+const string CategoryLabel = BaseLabel + "category";
+const string TitleLabel = BaseLabel + "title";
+const string PathLabel= BaseLabel + "path";
 
 const string TraefikEnable = "traefik.enable";
 const string TraefikRouterStart = "traefik.http.routers";
 const string TraefikRouterEnd= ".rule";
-const string CategoryLabel= "ch.freaxnx01.category";
-const string TitleLabel= "ch.freaxnx01.title";
-const string PathLabel= "ch.freaxnx01.path";
 
-var dashboard = new Dashboard(
-    Title: "Dashboard",
-    Subtitle: "",
-    Logo: "logo.png",
-    Services: new List<Category>()
-);
+Dashboard dashboard;
 
-foreach (var container in containers)
+var relevantContainers = containers.Where(c => c.LabelNamed(TraefikEnable) == "true");
+
+// Get Traefik Container, create Dashboard
+foreach (var container in relevantContainers)
 {
-    if (container.Labels.ContainsKey(TraefikEnable) && container.Labels[TraefikEnable] == "true")
+    if (container.LabelExists(DashboardTitleLabel))
     {
-        var categoryName = string.Empty;
+        dashboard = new Dashboard(
+            Title: container.LabelNamed(DashboardTitleLabel),
+            Subtitle: "",
+            Logo: "logo.png",
+            Services: new List<Service>()
+        );
+    }
+}
 
-        // Category
-        var categoryLabel = container.Labels.SingleOrDefault(l => l.Key == CategoryLabel);
-        if (!categoryLabel.Equals(default(KeyValuePair<string, string>)))
-        {
-            categoryName = categoryLabel.Value;
-        }
+foreach (var container in relevantContainers)
+{
+    //container.Names[0].Substring(1).FirstCharToUpper().Dump();
 
-        // Title
-        var title = string.Empty;
-        var titleLabel = container.Labels.SingleOrDefault(l => l.Key == TitleLabel);
-        if (!titleLabel.Equals(default(KeyValuePair<string, string>)))
-        {
-            title = titleLabel.Value;
-        }
+    // Service
+    var serviceName = container.LabelNamed(CategoryLabel);
 
-        // ch.freaxnx01.path
-        var hasPathLabels = container.Labels.Any(l => l.Key.StartsWith(PathLabel));
+    var service = dashboard.Services.SingleOrDefault(c => c.Name == serviceName);
+
+    var title = container.LabelNamed(TitleLabel);
+
+    // ch.freaxnx01.path
+    var hasPathLabels = container.Labels.Any(l => l.Key.StartsWith(PathLabel));
+
+    if (hasPathLabels)
+    {
+        categoryName += $" {title}";
+    }
+
+    if (service is null)
+    {
+        service = new Service(
+            Name: serviceName,
+            Icon: "fas fa-cloud",
+            Items: new SortedList<string, Item>()
+        );
+        dashboard.Services.Add(service);
+    }
+
+    var rule = container.LabelNamed(TraefikRouterStart, TraefikRouterEnd);
+    if (rule != null)
+    {
+        (string host, string path) = ParseTraefikRule(rule);
+
+        //TODO: Ensure end with /
+        var baseUrl = $"https://{host}{path}/";
 
         if (hasPathLabels)
         {
-            categoryName += $" {title}";
+            /*
+            - "ch.freaxnx01.path.switzerland.title=Schweiz"
+            - "ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
+            */
+
+            var subLabels = GetSubLabels(PathLabel);
         }
-
-        var category = dashboard.Services.SingleOrDefault(c => c.Name == categoryName);
-
-        if (category is null)
+        else
         {
-            category = new Category(
-                Name: categoryName,
-                Icon: "fas fa-cloud",
-                Items: new List<Item>()
+            var item = new Item(
+                Name: title, 
+                Tag: container.Names[0].Substring(1).FirstCharToUpper(),
+                Url: baseUrl
             );
-            dashboard.Services.Add(category);
-        }
-        
-        var label = container.Labels.SingleOrDefault(
-            l => l.Key.StartsWith(TraefikRouterStart) && l.Key.EndsWith(TraefikRouterEnd));
-        if (!label.Equals(default(KeyValuePair<string, string>)))
-        {
-            var rule = label.Value;
-            var match = HostPathPrefixRegex.Match(rule);
-            
-            if (string.IsNullOrEmpty(match.Groups["path"].Value))
-            {
-                 match = HostRegex.Match(rule);
-            }
 
-            //TODO: Ensure end with /
-            var baseUrl = $"https://{match.Groups["host"].Value}{match.Groups["path"].Value}";
-            
-            var tag = container.Names[0].Substring(1).FirstCharToUpper();
-
-            if (hasPathLabels)
-            {
-                /*
-                - "ch.freaxnx01.path.switzerland.title=Schweiz"
-                - "ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
-                */
-
-                var subLabels = GetSubLabels(PathLabel);
-            }
-            else
-            {
-                var item = new Item(
-                    Name: title, 
-                    Tag: tag,
-                    Url: baseUrl
-                );
-
-                category.Items.Add(item);
-            }
+            service.Items.Add(title, item);
         }
     }
 }
 
-var serializer = new SerializerBuilder()
-    .WithNamingConvention(CamelCaseNamingConvention.Instance)
-    .WithIndentedSequences()
-    //.WithEventEmitter(nextEmitter => new QuoteSurroundingEventEmitter(nextEmitter))
-    .Build();
+var dashboardSorted = new Dashboard(
+    Title: dashboard.Title,
+    Subtitle: dashboard.Subtitle,
+    Logo: dashboard.Logo,
+    Services: dashboard.Services.OrderBy(s => s.Name).ToList()
+);
 
-var yaml = serializer.Serialize(dashboard);
-Console.Write(yaml);
+Console.Write(dashboardSorted.SerialzeToYaml());
 
 //TODO -> DockerApiClient
 public Dictionary<string, Dictionary<string, string>> GetSubLabels(string subLabel)
@@ -177,9 +168,93 @@ public Dictionary<string, Dictionary<string, string>> GetSubLabels(string subLab
     return returnValue;
 }
 
+#region Parse Traefik rule
+public static Regex HostPathPrefixRegex = new Regex(
+    "Host\\(`(?<host>[^`]*)`\\).*PathPrefix\\(`(?<path>[^`]*)`\\)",
+    RegexOptions.CultureInvariant
+    | RegexOptions.Compiled
+);
+
+public static Regex HostRegex = new Regex(
+    "Host\\(`(?<host>[^`]*)`\\)",
+    RegexOptions.CultureInvariant
+    | RegexOptions.Compiled
+);
+
+public static (string Host, string Path) ParseTraefikRule(string rule)
+{
+    var match = HostPathPrefixRegex.Match(rule);
+    
+    // Subdomain only
+    if (string.IsNullOrEmpty(match.Groups["path"].Value))
+    {
+        match = HostRegex.Match(rule);
+    }
+
+    return (match.Groups["host"].Value, match.Groups["path"].Value);
+}
+
+#endregion
+
+#region Docker client helpers
+
+public static DockerClient GetDockerClient()
+{
+    return new DockerClientConfiguration(
+        new Uri(IsLinux() ? "unix:///var/run/docker.sock" : "npipe://./pipe/docker_engine"))
+    .CreateClient();
+}
+
+public static string LabelNamed(this ContainerListResponse container, string startsWith, string endsWith)
+{
+    var label = container.Labels.SingleOrDefault(l => l.Key.StartsWith(startsWith) && l.Key.EndsWith(endsWith));
+    if (!label.Equals(default(KeyValuePair<string, string>)))
+    {
+        return label.Value;
+    }
+
+    return null;
+}
+
+public static bool LabelExists(this ContainerListResponse container, string labelName)
+{
+    return container.Labels.Any(l => l.Key == labelName);
+}
+
+public static string LabelNamed(this ContainerListResponse container, string labelName)
+{
+    var label = container.Labels.SingleOrDefault(l => l.Key == labelName);
+    if (!label.Equals(default(KeyValuePair<string, string>)))
+    {
+        return label.Value;
+    }
+
+    return null;
+}
+
+#endregion
+
+#region Generic helpers
 public static void Dump(this object text)
 {
     Console.WriteLine(text);
+}
+
+public static bool IsWindows() =>
+    RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+
+public static bool IsLinux() =>
+    RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+
+public static string SerialzeToYaml(this object objectToSerialize)
+{
+    var serializer = new SerializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .WithIndentedSequences()
+        .Build();
+
+    return serializer.Serialize(objectToSerialize);
 }
 
 public static string FirstCharToUpper(this string input) =>
@@ -190,6 +265,9 @@ public static string FirstCharToUpper(this string input) =>
         _ => input.First().ToString().ToUpper() + input.Substring(1)
     };
 
+#endregion
+
+/*
 public class QuoteSurroundingEventEmitter : ChainedEventEmitter
 {
     public QuoteSurroundingEventEmitter(IEventEmitter nextEmitter)  : base(nextEmitter)
@@ -202,3 +280,4 @@ public class QuoteSurroundingEventEmitter : ChainedEventEmitter
             base.Emit(eventInfo, emitter);
     }
 }
+*/
