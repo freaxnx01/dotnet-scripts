@@ -71,16 +71,12 @@ public class Item
     }
 }
 
-// public record Dashboard(string Title, string Subtitle, string Logo, List<Service> Services);
-// public record Service(string Name, string Icon, List<Item> Items);
-// public record Item(string Name, string Tag, string Url, string Target = "_blank", string Logo = "assets/tools/sample.png", string Subtitle = "");
-
 var containers = await GetDockerClient().Containers.ListContainersAsync(new ContainersListParameters());
 
 // Docker labels
 
 /*
-"ch.freaxnx01.dashboard-title=8c458b.online-server.cloud"
+"ch.freaxnx01.dashboard-title="
 
 "ch.freaxnx01.category=Cloud"
 "ch.freaxnx01.title=Nextcloud"
@@ -89,7 +85,7 @@ var containers = await GetDockerClient().Containers.ListContainersAsync(new Cont
 "ch.freaxnx01.title=Movies"
 
 "ch.freaxnx01.path.switzerland.title=Schweiz"
-"ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
+"ch.freaxnx01.path.switzerland.target=..."
 */
 
 const string BaseLabel = "ch.freaxnx01.";
@@ -117,20 +113,11 @@ foreach (var container in relevantContainers)
             Subtitle = "",
             Logo = "logo.png"
         };
-
-        // dashboard = new Dashboard(
-        //     Title: container.LabelNamed(DashboardTitleLabel),
-        //     Subtitle: "",
-        //     Logo: "logo.png",
-        //     Services: new List<Service>()
-        // );
     }
 }
 
 foreach (var container in relevantContainers)
 {
-    //container.Names[0].Substring(1).FirstCharToUpper().Dump();
-
     // Service
     var serviceName = container.LabelNamed(CategoryLabel);
 
@@ -152,15 +139,7 @@ foreach (var container in relevantContainers)
         {
             Name = serviceName,
             Icon = "fas fa-cloud",
-            //Items: new SortedList<string, Item>()
         };
-
-        // service = new Service(
-        //     Name: serviceName,
-        //     Icon: "fas fa-cloud",
-        //     Items: new List<Item>()
-        //     //Items: new SortedList<string, Item>()
-        // );
         
         dashboard.Services.Add(service);
     }
@@ -170,7 +149,6 @@ foreach (var container in relevantContainers)
     {
         (string host, string path) = ParseTraefikRule(rule);
 
-        //TODO: Ensure end with /
         var baseUrl = $"https://{host}{path}/";
         var containerName = container.Names[0].Substring(1).FirstCharToUpper();
 
@@ -178,7 +156,7 @@ foreach (var container in relevantContainers)
         {
             /*
             - "ch.freaxnx01.path.switzerland.title=Schweiz"
-            - "ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
+            - "ch.freaxnx01.path.switzerland.target=..."
             */
 
             foreach (var subLabel in GetSubLabels(PathLabel, container.Labels))
@@ -190,15 +168,7 @@ foreach (var container in relevantContainers)
                     Url = string.Concat(baseUrl, subLabel.Value["target"])
                 };
 
-                // var item = new Item(
-                //     Name: subLabel.Value["title"], 
-                //     Tag: $"{containerName} {subLabel.Key}",
-                //     Url: string.Concat(baseUrl, subLabel.Value["target"])
-                // );
-
-                //TODO
                 service.Items.Add(item);
-                //service.Items.Add(subLabel.Key, item);
             }
         }
         else
@@ -210,14 +180,7 @@ foreach (var container in relevantContainers)
                 Url = baseUrl
             };
 
-            // var item = new Item(
-            //     Name: title, 
-            //     Tag: containerName,
-            //     Url: baseUrl
-            // );
-
             service.Items.Add(item);
-            //service.Items.Add(containerName, item);
         }
     }
 }
@@ -229,13 +192,6 @@ var dashboardSorted = new Dashboard()
     Logo = dashboard.Logo,
     Services = dashboard.Services.OrderBy(s => s.Name).ToList()
 };
-
-// var dashboardSorted = new Dashboard(
-//     Title: dashboard.Title,
-//     Subtitle: dashboard.Subtitle,
-//     Logo: dashboard.Logo,
-//     Services: dashboard.Services.OrderBy(s => s.Name).ToList()
-// );
 
 foreach (var service in dashboardSorted.Services)
 {
@@ -250,14 +206,14 @@ public Dictionary<string, Dictionary<string, string>> GetSubLabels(string subLab
     /*
     Input:
     - "ch.freaxnx01.path.switzerland.title=Schweiz"
-    - "ch.freaxnx01.path.switzerland.target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8"
+    - "ch.freaxnx01.path.switzerland.target=..."
     */
 
     /*
     Output:
     - switzerland
         - title=Schweiz
-        - target=showgeomarker.html?source=destinationen.json&keyword=Schweiz&zoom=8
+        - target=...
     */
 
     var dict = new Dictionary<string, Dictionary<string, string>>();
@@ -385,18 +341,3 @@ public static string FirstCharToUpper(this string input) =>
     };
 
 #endregion
-
-/*
-public class QuoteSurroundingEventEmitter : ChainedEventEmitter
-{
-    public QuoteSurroundingEventEmitter(IEventEmitter nextEmitter)  : base(nextEmitter)
-    { }
-
-    public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
-    {
-        if(eventInfo.Source.StaticType == typeof (String))
-            eventInfo.Style = ScalarStyle.DoubleQuoted;
-            base.Emit(eventInfo, emitter);
-    }
-}
-*/
