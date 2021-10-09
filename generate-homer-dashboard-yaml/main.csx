@@ -128,7 +128,7 @@ foreach (var container in relevantContainers)
             {
                 var item = new Item(
                     Name: subLabel.Value["title"], 
-                    Tag: containerName,
+                    Tag: $"{containerName} {subLabel.Key}",
                     Url: string.Concat(baseUrl, subLabel.Value["target"])
                 );
 
