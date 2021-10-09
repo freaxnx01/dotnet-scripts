@@ -132,6 +132,7 @@ foreach (var container in relevantContainers)
                     Url: string.Concat(baseUrl, subLabel.Value["target"])
                 );
 
+                //TODO
                 //service.Items.Add(subLabel.Key, item);
             }
         }
@@ -143,7 +144,7 @@ foreach (var container in relevantContainers)
                 Url: baseUrl
             );
 
-            service.Items.Add(title, item);
+            service.Items.Add(containerName, item);
         }
     }
 }
